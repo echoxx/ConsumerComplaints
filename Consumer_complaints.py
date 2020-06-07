@@ -20,33 +20,21 @@
 #
 # ### Project type: Data cleaning & investigation
 
-# +
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 # %matplotlib inline
 
-
-
-# +
-"""  Used to see all rows of a data frame without permanently resetting maximum displayed rows."""
-
 def print_full(x):
+    """  Used to see all rows of a data frame without permanently resetting maximum displayed rows."""
     pd.set_option('display.max_rows', len(x)) 
     print(x)
     pd.reset_option('display.max_rows')
 
-def print_len(data, int):
-    pd.set_option('display.max_rows', int)
-    print(data)
-    pd.reset_option('display.max_rows')
-
-
-# -
 
 complaints = pd.read_csv('Consumer_Complaints.csv')
 
-print( len(complaints))
+print(f'Number of complaints: {len(complaints)}')
 complaints.head()
 
 # ## Clean Data (A):
@@ -57,23 +45,26 @@ complaints.head()
 # [To Do:] Check for null values
 
 # +
-cols_dropped = ['Consumer complaint narrative', 'Company public response', 'Tags', 
+unnecessary_cols = ['Consumer complaint narrative', 'Company public response', 'Tags', 
                 'Consumer consent provided?', 'Submitted via', 'Date sent to company', 'Timely response?', 
                 'Complaint ID']
 
-complaints.drop(cols_dropped, axis = 1, inplace = True)
+complaints.drop(unnecessary_cols, axis = 1, inplace = True)
 # -
 
+complaints.head()
+
 # Reference: https://www.dataquest.io/blog/pandas-cheat-sheet/
-complaints.columns = ['date_received', 'product', 'sub_product', 
-                      'issue', 'sub_issue', 
-                      'company', 'state', 'zip', 
-                      'comp_response_to_consumer',
-                      'disputed']
+complaints.rename(columns = {'Date received': 'date_received', 'Product': 'product',
+                            'Sub-product': 'sub_product', 'Issue': 'issue',
+                            'Sub-issue': 'sub_issue', 'Company': 'company',
+                            'State': 'state', 'Zip code': 'zip',
+                            'Company response to consumer': 'company_response_to_consumer',
+                            'Consumer disputed?': 'disputed'},
+                 inplace = True)
 
-
-complaints['date_received'] = pd.to_datetime(complaints['date_received'], format = '%m/%d/%Y') 
-
+complaints['date_received'] = pd.to_datetime(complaints['date_received'],format = '%m/%d/%Y', errors = 'ignore')
+complaints.head()
 
 # ## Investigate Data (1)
 # * Review column names and object types (all 'object' are strings, and therefore could require additional cleaning).
@@ -175,8 +166,11 @@ complaints.loc[complaints['product'] == 'Consumer Loan'] = 'Consumer loan' # for
 # +
 """ 1. Credit card or prepaid card / credit card / prepaid card """
 
+
+
 # Credit card or prepaid card
 credit_or_prepaid_bool = complaints['product'] == 'Credit card or prepaid card'
+# IS THIS AN UNNECESSARY STEP? CAN IT BE REWRITTEN?
 credit_or_prepaid_cards = complaints[credit_or_prepaid_bool]
 print("Credit or prepaid card sub_products:", 
       '\n', 
@@ -266,28 +260,35 @@ Initially, ran into issues with settingiwthcopywarning in this cell, due to chai
 Accurate syntax for fixing this was found at: https://www.dataquest.io/blog/settingwithcopywarning/
 """
 
-""" Resort 'Credit card or prepaid card' product group into either 'credit card' or 'prepaid card' """
+
 # Resort the following into 'Credit card' product
-complaints.loc[complaints['sub_product'] == 'General-purpose credit card or charge card', 'product'] = 'Credit card'
-complaints.loc[complaints['sub_product'] == 'Store credit card', 'product'] = 'Credit card'
+credit_card_group = ['General-purpose credit card or charge card',
+                    'Store credit card']
+
+for item in credit_card_group:
+    complaints.loc[complaints['sub_product'] == item, 'product'] = 'Credit card'
+
 
 # Resort the following into 'Prepaid card' product group
-complaints.loc[complaints['sub_product'] == 'General-purpose prepaid card', 'product'] = 'Prepaid card'
-complaints.loc[complaints['sub_product'] == 'Government benefit card', 'product'] = 'Prepaid card'
-complaints.loc[complaints['sub_product'] == 'Payroll card', 'product'] = 'Prepaid card'
-complaints.loc[complaints['sub_product'] == 'Gift card', 'product'] = 'Prepaid card'
-complaints.loc[complaints['sub_product'] == 'Student prepaid card', 'product'] = 'Prepaid card'
+prepaid_card_group = ['General-purpose prepaid card', 'Government benefit card', 'Payroll card', 
+                     'Gift card', 'Student prepaid card']
+
+for item in prepaid_card_group:
+    complaints.loc[complaints['sub_product'] == item, 'product'] = 'Prepaid card'
+
 
 
 
 # -
 
+print('Virtual currency products:')
 complaints.loc[complaints['sub_product'] == 'Virtual currency', 'product'].value_counts()
 
+print('Virtual currency sub products:')
 complaints.loc[complaints['product'] == 'Virtual currency', 'sub_product'].value_counts()
 
 # ### Observations:
-# * All "Virtual currency" products have a sub_product that fits more appropriately in a "Money Transfer" product
+# * The only "Virtual currency" product has a sub_product that fits more appropriately in a "Money Transfer" product
 # * All "Virtual currency" sub_products currently fall within the "Money transfer, Virtual currency, or money service" product
 
 # +
@@ -333,36 +334,32 @@ complaints.loc[(complaints['sub_product'] == 'Pawn loan') &
 # +
 """ Shorten credit reporting product category name"""
 
-complaints.loc[complaints['product'] == 'Credit reporting, credit repair services, or other personal consumer reports', 
+complaints.loc[
+    complaints['product'] == 'Credit reporting, credit repair services, or other personal consumer reports', 
                'product'] = 'Credit reporting'
 
 # +
 """ Review revised product/sub_category groups """
 
+product_groups = ['Credit card', 'Prepaid card', 'Virtual currency', 'Money transfers', 'Money service',
+           'Payday loan', 'Consumer loan']
 
-print ('Credit card: ', '\n', complaints.loc[complaints['product'] == 'Credit card', 'sub_product'].value_counts() )
-print('\n')
-print ('Prepaid card: ', '\n', complaints.loc[complaints['product'] == 'Prepaid card', 'sub_product'].value_counts() )
-print('\n')
-print ('Virtual currency: ', '\n', complaints.loc[complaints['product'] == 'Virtual currency', 'sub_product'].value_counts() )
-print('\n')
-print ('Money transfers: ', '\n', complaints.loc[complaints['product'] == 'Money transfers', 'sub_product'].value_counts() )
-print('\n')
-print ('Money service: ', '\n', complaints.loc[complaints['product'] == 'Money service', 'sub_product'].value_counts() )
-print('\n')
-print ('Payday loan: ', '\n', complaints.loc[complaints['product'] == 'Payday loan', 'sub_product'].value_counts() )
-print('\n')
-print ('Consumer loan: ', '\n', complaints.loc[complaints['product'] == 'Consumer loan', 'sub_product'].value_counts() )
-print('\n')
-print('Products: ', '\n', complaints['product'].value_counts())
+for product in product_groups:
+    print(f"{product}: \n{complaints.loc[complaints['product'] == product, 'sub_product'].value_counts()}\n")
 # -
 
 # ## Prepare data for presentation
 # * Create container variables for sub_products for easy comparison & graphic creation.
 # * Add % columns to product and sub_product dataframes for graphics.
 
+ack = 'blargh'
+ack + '_blargh'
+
+
+
 # +
 """ Create variables containing sub_products of each product """
+# DRY
 
 credit_reporting_bool = complaints['product'] == 'Credit reporting'
 credit_rep_subproducts = complaints[credit_reporting_bool]['sub_product'].value_counts()
@@ -420,6 +417,7 @@ other_subproducts = complaints[other_bool]['sub_product'].value_counts()
 
 
 # +
+# PRODUCTS IS A DUPLICATED VARIABLE ABOVE
 products = complaints['product'].value_counts()
 products = products.to_frame() # Otherwise 'products' is a series and additional column cannot be added
 
@@ -442,6 +440,7 @@ print(sub_products)
 print(sum(sub_products['perc_total'])) # Check sum to 100%
 
 # +
+# DRY
 """ Review most complained about sub_products in top 5 product groups"""
 print('Credit report', '\n', complaints.loc[complaints['product'] == 'Credit reporting', 'sub_product'].value_counts() )
 print('\n')
@@ -545,6 +544,7 @@ plt.show()
 
 credit_rep_subproducts.plot(kind='bar')
 
+# DRY
 print( complaints.loc[complaints['product'] == 'Credit reporting', 'issue'].value_counts() )
 print('\n')
 print( complaints.loc[complaints['product'] == 'Credit reporting', 'sub_issue'].value_counts() )
